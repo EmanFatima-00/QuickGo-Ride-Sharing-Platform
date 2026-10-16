@@ -1,16 +1,33 @@
-# task4_dual_dashboard
+# QuickGo - Ride & Delivery Platform
 
-A new Flutter project.
+QuickGo is a Flutter-based on-demand service platform designed for local cities like Jhang. It connects customers with nearby service providers for rides and deliveries with real-time tracking.
 
-## Getting Started
+### Features
 
-This project is a starting point for a Flutter application.
+**Customer Dashboard:**
+- Book ride / delivery in 2 taps
+- Live GPS tracking of provider on map
+- Ride history & fare estimation
+- Real-time request status
 
-A few resources to get you started if this is your first Flutter project:
+**Service Provider Dashboard:**
+- Online / Offline toggle
+- Accept / Reject incoming requests
+- Live location sharing to customer
+- Earnings and trip history
+- Navigation integration
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### Tech Stack
+- Flutter & Dart
+- Firebase Auth & Firestore
+- Google Maps SDK & Geolocator
+- Provider for state management
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### How to Run
+flutter pub get
+flutter run
+
+### Setup
+Add your Google Maps API Key in android/app/src/main/AndroidManifest.xml
+
+Built for local transport solutions in Pakistan.
