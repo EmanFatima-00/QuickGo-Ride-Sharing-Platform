@@ -17,13 +17,30 @@ jobs:
           PUB=$(find . -name "pubspec.yaml" | head -n 1 | xargs dirname)
           echo "PUB_DIR=$PUB" >> $GITHUB_ENV
           echo "Found $PUB"
-      - name: Fix missing android folder
+      - name: Fix android folder
         run: |
           cd $PUB_DIR
           if [ ! -f "android/app/build.gradle" ]; then
-            echo "Recreating android folder..."
             flutter create . --platforms=android --project-name quickgo
           fi
+      - name: Enable desugaring for notifications
+        run: |
+          cd $PUB_DIR
+          FILE="android/app/build.gradle"
+          # Add desugar dependency if missing
+          if ! grep -q "desugar_jdk_libs" "$FILE"; then
+            sed -i "/dependencies {/a \    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs_configuration:2.1.4'" "$FILE"
+          fi
+          # Enable desugaring
+          if ! grep -q "isCoreLibraryDesugaringEnabled" "$FILE"; then
+            sed -i "s/isMinifyEnabled.*/isMinifyEnabled false\n        isCoreLibraryDesugaringEnabled true/" "$FILE"
+            sed -i "s/minifyEnabled.*/minifyEnabled false\n        coreLibraryDesugaringEnabled true/" "$FILE"
+          fi
+          # Ensure compileOptions has desugaring true
+          if ! grep -q "coreLibraryDesugaringEnabled true" "$FILE" && ! grep -q "isCoreLibraryDesugaringEnabled true" "$FILE"; then
+            sed -i "/compileOptions {/a \        coreLibraryDesugaringEnabled true\n        isCoreLibraryDesugaringEnabled true" "$FILE"
+          fi
+          cat "$FILE"
       - run: cd $PUB_DIR && flutter pub get
       - run: cd $PUB_DIR && flutter build apk --debug
       - uses: actions/upload-artifact@v4
