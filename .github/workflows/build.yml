@@ -5,16 +5,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
-      - run: flutter pub get
-      - run: flutter build apk --debug
+          channel: 'stable'
+      - name: Find project
+        run: |
+          ls -la
+          PUB=$(find . -name "pubspec.yaml" | head -n 1 | xargs dirname)
+          echo "PUB_DIR=$PUB" >> $GITHUB_ENV
+          echo "Project found in $PUB"
+      - run: cd $PUB_DIR && flutter pub get
+      - run: cd $PUB_DIR && flutter build apk --debug
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: ${{ env.PUB_DIR }}/build/app/outputs/flutter-apk/app-debug.apk
