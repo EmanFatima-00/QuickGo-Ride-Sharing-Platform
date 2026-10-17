@@ -14,10 +14,16 @@ jobs:
           channel: 'stable'
       - name: Find project
         run: |
-          ls -la
           PUB=$(find . -name "pubspec.yaml" | head -n 1 | xargs dirname)
           echo "PUB_DIR=$PUB" >> $GITHUB_ENV
-          echo "Project found in $PUB"
+          echo "Found $PUB"
+      - name: Fix missing android folder
+        run: |
+          cd $PUB_DIR
+          if [ ! -f "android/app/build.gradle" ]; then
+            echo "Recreating android folder..."
+            flutter create . --platforms=android --project-name quickgo
+          fi
       - run: cd $PUB_DIR && flutter pub get
       - run: cd $PUB_DIR && flutter build apk --debug
       - uses: actions/upload-artifact@v4
