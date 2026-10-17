@@ -12,48 +12,85 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          flutter-version: '3.22.2'
 
-      - name: Find project
+      - name: Find pubspec
         run: |
           PUB=$(find . -name "pubspec.yaml" | head -n 1 | xargs dirname)
           echo "PUB_DIR=$PUB" >> $GITHUB_ENV
+          echo $PUB
 
-      - name: Recreate android if missing
+      - name: Fix Android completely
         run: |
           cd $PUB_DIR
-          if [ ! -f "android/app/build.gradle" ] && [ ! -f "android/app/build.gradle.kts" ]; then
-            flutter create . --platforms=android
-          fi
-
-      - name: Fix desugaring with Python
-        run: |
-          cd $PUB_DIR
-          python3 << 'PY'
-          import pathlib, re
-          f = pathlib.Path("android/app/build.gradle")
-          if not f.exists():
-              f = pathlib.Path("android/app/build.gradle.kts")
-          text = f.read_text()
+          flutter create . --platforms=android --project-name quickgo
           
-          # 1. Ensure compileOptions has desugaring enabled
-          if "isCoreLibraryDesugaringEnabled" not in text and "coreLibraryDesugaringEnabled" not in text:
-              text = text.replace("compileOptions {", "compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n        coreLibraryDesugaringEnabled true")
-          else:
-              text = text.replace("isCoreLibraryDesugaringEnabled = false", "isCoreLibraryDesugaringEnabled = true")
-              text = text.replace("coreLibraryDesugaringEnabled false", "coreLibraryDesugaringEnabled true")
+          cat > android/app/build.gradle << 'GRADLE'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
 
-          # 2. Add desugar dependency
-          if "desugar_jdk_libs" not in text:
-              text = text.replace("dependencies {", "dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'")
+          def localProperties = new Properties()
+          def localPropertiesFile = rootProject.file('local.properties')
+          if (localPropertiesFile.exists()) {
+              localPropertiesFile.withReader('UTF-8') { reader ->
+                  localProperties.load(reader)
+              }
+          }
 
-          f.write_text(text)
-          print(f.read_text()[-1000:])
-          PY
+          def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+          if (flutterVersionCode == null) { flutterVersionCode = '1' }
+          def flutterVersionName = localProperties.getProperty('flutter.versionName')
+          if (flutterVersionName == null) { flutterVersionName = '1.0' }
+
+          android {
+              namespace "com.example.quickgo"
+              compileSdk flutter.compileSdkVersion
+              ndkVersion flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+                  coreLibraryDesugaringEnabled true
+                  isCoreLibraryDesugaringEnabled true
+              }
+
+              kotlinOptions {
+                  jvmTarget = '1.8'
+              }
+
+              defaultConfig {
+                  applicationId "com.example.quickgo"
+                  minSdkVersion flutter.minSdkVersion
+                  targetSdkVersion flutter.targetSdkVersion
+                  versionCode flutterVersionCode.toInteger()
+                  versionName flutterVersionName
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+
+          flutter {
+              source '../..'
+          }
+
+          dependencies {
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+          }
+          GRADLE
+          
+          cat android/app/build.gradle
 
       - run: cd $PUB_DIR && flutter pub get
-      - run: cd $PUB_DIR && flutter build apk --debug --no-tree-shake-icons
+      - run: cd $PUB_DIR && flutter build apk --debug
 
       - uses: actions/upload-artifact@v4
         with:
-          name: QuickGo-APK
+          name: QuickGo-APK-Final
           path: ${{ env.PUB_DIR }}/build/app/outputs/flutter-apk/app-debug.apk
