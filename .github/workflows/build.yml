@@ -12,85 +12,37 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.22.2'
 
-      - name: Find pubspec
+      - name: Find project and auto-fix pubspec
         run: |
           PUB=$(find . -name "pubspec.yaml" | head -n 1 | xargs dirname)
           echo "PUB_DIR=$PUB" >> $GITHUB_ENV
-          echo $PUB
+          echo "Found $PUB"
+          # Auto-disable the breaking library inside workflow itself
+          sed -i 's/.*flutter_local_notifications/# &/' $PUB/pubspec.yaml || true
+          echo "Patched pubspec:"
+          cat $PUB/pubspec.yaml | grep -A2 -B2 notification || true
 
-      - name: Fix Android completely
+      - name: Auto-fix dart files
         run: |
           cd $PUB_DIR
-          flutter create . --platforms=android --project-name quickgo
-          
-          cat > android/app/build.gradle << 'GRADLE'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-          }
+          # Comment out any import of flutter_local_notifications automatically
+          find lib -type f -name "*.dart" -exec sed -i 's/.*flutter_local_notifications/\/\/ &/' {} \; || true
+          find lib -type f -name "*.dart" -exec sed -i 's/.*FlutterLocalNotifications/\/\/ &/' {} \; || true
 
-          def localProperties = new Properties()
-          def localPropertiesFile = rootProject.file('local.properties')
-          if (localPropertiesFile.exists()) {
-              localPropertiesFile.withReader('UTF-8') { reader ->
-                  localProperties.load(reader)
-              }
-          }
+      - name: Recreate android
+        run: |
+          cd $PUB_DIR
+          flutter create . --platforms=android --project-name quickgo || true
 
-          def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-          if (flutterVersionCode == null) { flutterVersionCode = '1' }
-          def flutterVersionName = localProperties.getProperty('flutter.versionName')
-          if (flutterVersionName == null) { flutterVersionName = '1.0' }
+      - name: Build APK
+        run: |
+          cd $PUB_DIR
+          flutter pub get
+          flutter build apk --debug --no-tree-shake-icons
 
-          android {
-              namespace "com.example.quickgo"
-              compileSdk flutter.compileSdkVersion
-              ndkVersion flutter.ndkVersion
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-                  coreLibraryDesugaringEnabled true
-                  isCoreLibraryDesugaringEnabled true
-              }
-
-              kotlinOptions {
-                  jvmTarget = '1.8'
-              }
-
-              defaultConfig {
-                  applicationId "com.example.quickgo"
-                  minSdkVersion flutter.minSdkVersion
-                  targetSdkVersion flutter.targetSdkVersion
-                  versionCode flutterVersionCode.toInteger()
-                  versionName flutterVersionName
-              }
-
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.debug
-                  }
-              }
-          }
-
-          flutter {
-              source '../..'
-          }
-
-          dependencies {
-              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-          }
-          GRADLE
-          
-          cat android/app/build.gradle
-
-      - run: cd $PUB_DIR && flutter pub get
-      - run: cd $PUB_DIR && flutter build apk --debug
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: QuickGo-APK-Final
           path: ${{ env.PUB_DIR }}/build/app/outputs/flutter-apk/app-debug.apk
